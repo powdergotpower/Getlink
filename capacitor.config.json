@@ -1,0 +1,6 @@
+{
+  "appId": "com.getlink.app",
+  "appName": "Getlink",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
