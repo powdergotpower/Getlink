@@ -1,73 +1,141 @@
-# Welcome to your Lovable project
+# GetLink - Instant File Sharing
 
-## Project info
+Upload any file and get a universal web link to share or download. Perfect for quick file sharing across devices and platforms.
 
-**URL**: https://lovable.dev/projects/75f29289-7b06-42e1-9d5e-8d592fa8c32c
+## 🚀 Features
 
-## How can I edit this code?
+- **Universal Upload**: Support for all file types - images, videos, documents, audio, and more
+- **Instant Links**: Get shareable URLs immediately after upload
+- **Mobile Optimized**: Perfect experience on mobile devices with touch-friendly interface
+- **Secure Sharing**: Files hosted securely with unique URLs
 
-There are several ways of editing your application.
+## 📱 Mobile App (APK)
 
-**Use Lovable**
+This project automatically builds Android APKs using GitHub Actions.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/75f29289-7b06-42e1-9d5e-8d592fa8c32c) and start prompting.
+### Download APK
+- Check the [Releases](../../releases) section for the latest APK
+- Or download from [Actions](../../actions) artifacts after each build
 
-Changes made via Lovable will be committed automatically to this repo.
+### Building APK Locally in Termux
 
-**Use your preferred IDE**
+1. **Setup Termux environment:**
+```bash
+# Update packages
+pkg update && pkg upgrade
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# Install required packages
+pkg install nodejs git openjdk-17 android-tools
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# Install Android SDK (if not already installed)
+pkg install android-sdk
+```
 
-Follow these steps:
+2. **Clone and setup:**
+```bash
+# Clone your repository
+git clone <YOUR_REPO_URL>
+cd getlink
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Build web app
+npm run build
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. **Setup Capacitor:**
+```bash
+# Add Android platform
+npx cap add android
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Sync project
+npx cap sync android
+```
+
+4. **Build APK:**
+```bash
+# Navigate to android folder
+cd android
+
+# Make gradlew executable
+chmod +x ./gradlew
+
+# Build debug APK
+./gradlew assembleDebug
+
+# APK will be generated at:
+# android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## 🌐 Web Deployment
+
+### Option 1: GitHub Pages
+1. Enable GitHub Pages in repository settings
+2. Set source to "GitHub Actions"
+3. The web app will be available at `https://yourusername.github.io/getlink`
+
+### Option 2: Termux Local Server
+```bash
+# In project root
+npm run dev
+
+# Or build and serve
+npm run build
+npx serve dist
+```
+
+## 🔧 Development
+
+### Prerequisites
+- Node.js 18+
+- For mobile: Android SDK, Java 17+
+
+### Local Development
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Mobile Development
+```bash
+# After making changes
+npm run build
+npx cap sync
+npx cap run android  # Opens in Android Studio/emulator
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📋 Tech Stack
 
-**Use GitHub Codespaces**
+- **Frontend**: React, TypeScript, Tailwind CSS, Vite
+- **Mobile**: Capacitor
+- **UI Components**: shadcn/ui
+- **Build**: GitHub Actions
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🎯 GitHub Actions Workflow
 
-## What technologies are used for this project?
+The repository includes automated workflows for:
+- **APK Building**: Automatically builds Android APK on every push
+- **Release Creation**: Creates releases with downloadable APKs
+- **Artifact Storage**: Stores APKs for 30 days
 
-This project is built with:
+## 📖 Usage
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. **Web**: Visit the deployed URL and start uploading files
+2. **Mobile**: Install the APK and use the native app experience
+3. **Development**: Clone, install dependencies, and start coding
 
-## How can I deploy this project?
+## 🤝 Contributing
 
-Simply open [Lovable](https://lovable.dev/projects/75f29289-7b06-42e1-9d5e-8d592fa8c32c) and click on Share -> Publish.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Push and create a Pull Request
 
-## Can I connect a custom domain to my Lovable project?
+## 📄 License
 
-Yes, you can!
+This project is open source and available under the [MIT License](LICENSE).
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Note**: For production use, you'll need to implement a proper backend for file storage and URL generation. The current version demonstrates the UI/UX concept.
