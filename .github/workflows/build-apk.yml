@@ -12,98 +12,94 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1️⃣ Checkout code
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # 2️⃣ Setup Node.js
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
+      # Node setup for Capacitor
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-    # 3️⃣ Setup Java JDK (17 for Gradle/Capacitor)
-    - name: Setup Java JDK
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      # Java setup for Gradle/Capacitor
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-    # 4️⃣ Setup Android SDK
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        packages: |
-          platforms;android-34
-          build-tools;34.0.0
-          platform-tools
+      # Android SDK setup (explicit platforms and build-tools)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          ndk: 25.2.9519653
 
-    # 5️⃣ Install NPM dependencies
-    - name: Install dependencies
-      run: npm ci
+      # Install project dependencies
+      - name: Install dependencies
+        run: npm ci
 
-    # 6️⃣ Build web assets
-    - name: Build web app
-      run: npm run build
+      # Build Vite React web assets
+      - name: Build web app
+        run: npm run build
 
-    # 7️⃣ Install Capacitor CLI globally
-    - name: Install Capacitor CLI
-      run: npm install -g @capacitor/cli
+      # Install Capacitor CLI
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
 
-    # 8️⃣ Initialize Capacitor Android (if not exists)
-    - name: Initialize Capacitor Android
-      run: |
-        if [ ! -d "android" ]; then
-          npx cap add android
-        fi
-      continue-on-error: true
+      # Add Android platform if missing
+      - name: Initialize Capacitor (if needed)
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+        continue-on-error: true
 
-    # 9️⃣ Sync Capacitor with native Android
-    - name: Sync Capacitor
-      run: npx cap sync android
+      # Sync Capacitor project
+      - name: Sync Capacitor
+        run: npx cap sync android
 
-    # 🔟 Build APK (Debug)
-    - name: Build APK
-      run: |
-        cd android
-        chmod +x ./gradlew
-        ./gradlew clean
-        ./gradlew assembleDebug --stacktrace --info --warning-mode all
+      # Build APK
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
-    # 1️⃣1️⃣ Upload APK as artifact
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: getlink-debug-apk
-        path: android/app/build/outputs/apk/debug/app-debug.apk
-        retention-days: 30
+      # Upload APK as artifact
+      - name: Upload APK (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: getlink-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
 
-    # 1️⃣2️⃣ Create GitHub release (only on main branch)
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-      with:
-        tag_name: v${{ github.run_number }}
-        release_name: GetLink v${{ github.run_number }}
-        body: |
-          Automated release of GetLink APK
-          
-          Download the APK from the assets below.
-        draft: false
-        prerelease: false
+      # Create GitHub Release (main branch)
+      - name: Create Release (on main branch)
+        if: github.ref == 'refs/heads/main'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: GetLink v${{ github.run_number }}
+          body: |
+            Automated release of GetLink APK
 
-    # 1️⃣3️⃣ Upload APK to release
-    - name: Upload Release Asset
-      if: github.ref == 'refs/heads/main'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: android/app/build/outputs/apk/debug/app-debug.apk
-        asset_name: GetLink-v${{ github.run_number }}.apk
-        asset_content_type: application/vnd.android.package-archive
+            Download the APK from the assets below.
+          draft: false
+          prerelease: false
+
+      # Upload release APK
+      - name: Upload Release Asset
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: android/app/build/outputs/apk/debug/app-debug.apk
+          asset_name: GetLink-v${{ github.run_number }}.apk
+          asset_content_type: application/vnd.android.package-archive
