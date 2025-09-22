@@ -12,20 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # 1️⃣ Checkout repo
     - uses: actions/checkout@v4
 
+    # 2️⃣ Setup Node.js
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22'
         cache: 'npm'
 
+    # 3️⃣ Setup Java
     - name: Setup Java JDK
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
+    # 4️⃣ Setup Android SDK
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
@@ -36,7 +40,8 @@ jobs:
           platforms;android-34
           build-tools;34.0.0
 
-    - name: Cache Gradle packages
+    # 5️⃣ Cache Gradle dependencies
+    - name: Cache Gradle
       uses: actions/cache@v3
       with:
         path: |
@@ -46,55 +51,55 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    # 6️⃣ Install NPM dependencies
     - name: Install dependencies
       run: npm ci
 
+    # 7️⃣ Build web assets
     - name: Build web app
       run: npm run build
 
-    - name: Verify dist folder
-      run: ls -la dist/
-
-    - name: Add Android platform (clean)
+    # 8️⃣ Clean & add Android platform
+    - name: Add Android platform
       run: |
         if [ -d "android" ]; then
           rm -rf android
         fi
         npx cap add android
 
+    # 9️⃣ Ensure Gradle uses correct Java
     - name: Configure Gradle JVM
       run: |
-        mkdir -p android
         echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
         echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
 
-    - name: Fix Android Gradle config
+    # 🔟 Fix build.gradle for Java 17 without duplicating android{}
+    - name: Fix Gradle compile options
       run: |
-        # Ensure proper Java 17 compatibility
-        cat >> android/app/build.gradle << 'EOF'
-        
-        android {
-            compileOptions {
-                sourceCompatibility JavaVersion.VERSION_17
-                targetCompatibility JavaVersion.VERSION_17
-            }
-            kotlinOptions {
-                jvmTarget = "17"
-            }
-        }
-        EOF
+        sed -i '/android {/a \
+            compileOptions {\
+                sourceCompatibility JavaVersion.VERSION_17\
+                targetCompatibility JavaVersion.VERSION_17\
+            }\
+            kotlinOptions {\
+                jvmTarget = "17"\
+            }' android/app/build.gradle
 
+    # 1️⃣1️⃣ Sync Capacitor
     - name: Sync Capacitor
       run: npx cap sync android
 
+    # 1️⃣2️⃣ Make Gradlew executable
     - name: Make Gradlew executable
       run: chmod +x android/gradlew
 
-    - name: Build APK with detailed logging
+    # 1️⃣3️⃣ Build APK
+    - name: Build APK with Gradle
       run: |
         cd android
         ./gradlew assembleDebug --stacktrace --info
 
+    # 1️⃣4️⃣ Verify APK exists
     - name: Verify APK exists
       run: |
         if [ ! -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
@@ -103,14 +108,16 @@ jobs:
         fi
         ls -la android/app/build/outputs/apk/debug/
 
-    - name: Upload APK (artifact)
+    # 1️⃣5️⃣ Upload APK as artifact
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: getlink-debug-apk-${{ github.run_number }}
         path: android/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 30
 
-    - name: Create Release (on main branch)
+    # 1️⃣6️⃣ Create GitHub Release
+    - name: Create Release (main branch)
       if: github.ref == 'refs/heads/main'
       id: create_release
       uses: actions/create-release@v1
@@ -121,17 +128,14 @@ jobs:
         release_name: GetLink v${{ github.run_number }}
         body: |
           🚀 Automated release of GetLink APK
-          
-          📱 **Download Instructions:**
-          1. Download the APK from assets below
-          2. Install on Android device (enable "Unknown sources")
-          
+          📱 Download the APK from assets below.
           **Build Info:**
           - Commit: ${{ github.sha }}
           - Build: ${{ github.run_number }}
         draft: false
         prerelease: false
 
+    # 1️⃣7️⃣ Upload release asset
     - name: Upload Release Asset
       if: github.ref == 'refs/heads/main'
       uses: actions/upload-release-asset@v1
