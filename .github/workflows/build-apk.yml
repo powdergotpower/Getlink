@@ -17,23 +17,34 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'   # ✅ Capacitor requires >=20
+        node-version: '22'
         cache: 'npm'
 
     - name: Setup Java JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '17'   # ✅ Stable for Gradle/Capacitor
+        java-version: '17'
         distribution: 'temurin'
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
         cmdline-tools-version: "9477386"
+        accept-android-sdk-licenses: true
         packages: |
           platform-tools
           platforms;android-34
           build-tools;34.0.0
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
     - name: Install dependencies
       run: npm ci
@@ -41,29 +52,61 @@ jobs:
     - name: Build web app
       run: npm run build
 
-    - name: Install Capacitor CLI
-      run: npm install -g @capacitor/cli
+    - name: Verify dist folder
+      run: ls -la dist/
 
-    - name: Initialize Capacitor (if needed)
+    - name: Add Android platform (clean)
       run: |
-        if [ ! -d "android" ]; then
-          npx cap add android
+        if [ -d "android" ]; then
+          rm -rf android
         fi
-      continue-on-error: true
+        npx cap add android
+
+    - name: Configure Gradle JVM
+      run: |
+        mkdir -p android
+        echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
+        echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+
+    - name: Fix Android Gradle config
+      run: |
+        # Ensure proper Java 17 compatibility
+        cat >> android/app/build.gradle << 'EOF'
+        
+        android {
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+        EOF
 
     - name: Sync Capacitor
       run: npx cap sync android
 
-    - name: Build APK
+    - name: Make Gradlew executable
+      run: chmod +x android/gradlew
+
+    - name: Build APK with detailed logging
       run: |
         cd android
-        chmod +x ./gradlew
-        ./gradlew assembleDebug
+        ./gradlew assembleDebug --stacktrace --info
+
+    - name: Verify APK exists
+      run: |
+        if [ ! -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+          echo "APK not found!"
+          exit 1
+        fi
+        ls -la android/app/build/outputs/apk/debug/
 
     - name: Upload APK (artifact)
       uses: actions/upload-artifact@v4
       with:
-        name: getlink-debug-apk
+        name: getlink-debug-apk-${{ github.run_number }}
         path: android/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 30
 
@@ -72,14 +115,20 @@ jobs:
       id: create_release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}   # ✅ Use your PAT secret
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       with:
         tag_name: v${{ github.run_number }}
         release_name: GetLink v${{ github.run_number }}
         body: |
-          Automated release of GetLink APK
+          🚀 Automated release of GetLink APK
           
-          Download the APK from the assets below.
+          📱 **Download Instructions:**
+          1. Download the APK from assets below
+          2. Install on Android device (enable "Unknown sources")
+          
+          **Build Info:**
+          - Commit: ${{ github.sha }}
+          - Build: ${{ github.run_number }}
         draft: false
         prerelease: false
 
