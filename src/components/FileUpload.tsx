@@ -12,18 +12,14 @@ interface UploadedFile {
   preview?: string;
 }
 
+const UPLOAD_URL = "http://192.168.1.8:3000/upload"; // Termux backend for testing
+
 const FileUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  const generateFileUrl = (fileName: string) => {
-    const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 15);
-    return `https://getlink.demo/${randomId}-${timestamp}/${encodeURIComponent(fileName)}`;
-  };
 
   const handleFiles = useCallback(async (fileList: FileList) => {
     setIsUploading(true);
@@ -32,41 +28,47 @@ const FileUpload = () => {
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       const id = Math.random().toString(36).substring(2, 15);
-      const url = generateFileUrl(file.name);
-      
-      let preview: string | undefined;
-      if (file.type.startsWith('image/')) {
-        preview = URL.createObjectURL(file);
-      }
 
-      newFiles.push({
-        file,
-        id,
-        url,
-        preview,
-      });
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch(UPLOAD_URL, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json(); // Expect { link: "real URL" }
+        const url = data.link;
+
+        let preview: string | undefined;
+        if (file.type.startsWith("image/")) {
+          preview = URL.createObjectURL(file);
+        }
+
+        newFiles.push({ file, id, url, preview });
+      } catch (err) {
+        console.error(err);
+        toast({ title: "Upload failed", description: file.name });
+      }
     }
 
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setFiles(prev => [...prev, ...newFiles]);
+    setFiles((prev) => [...prev, ...newFiles]);
     setIsUploading(false);
-    
     toast({
       title: "Files uploaded successfully!",
       description: `${newFiles.length} file(s) ready to share`,
     });
   }, [toast]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      handleFiles(droppedFiles);
-    }
-  }, [handleFiles]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const droppedFiles = e.dataTransfer.files;
+      if (droppedFiles.length > 0) handleFiles(droppedFiles);
+    },
+    [handleFiles]
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -78,13 +80,16 @@ const FileUpload = () => {
     setIsDragging(false);
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = e.target.files;
-    if (selectedFiles && selectedFiles.length > 0) {
-      handleFiles(selectedFiles);
-    }
-    e.target.value = '';
-  }, [handleFiles]);
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFiles = e.target.files;
+      if (selectedFiles && selectedFiles.length > 0) {
+        handleFiles(selectedFiles);
+      }
+      e.target.value = "";
+    },
+    [handleFiles]
+  );
 
   const copyToClipboard = async (url: string) => {
     try {
@@ -103,15 +108,15 @@ const FileUpload = () => {
   };
 
   const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(file => file.id !== id));
+    setFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   return (
@@ -121,8 +126,8 @@ const FileUpload = () => {
         className={cn(
           "relative border-2 border-dashed transition-all duration-300 ease-bounce",
           "bg-gradient-upload backdrop-blur-sm",
-          isDragging 
-            ? "border-primary bg-primary/10 shadow-glow" 
+          isDragging
+            ? "border-primary bg-primary/10 shadow-glow"
             : "border-muted-foreground/25 hover:border-primary/50",
           isUploading && "animate-pulse-glow"
         )}
@@ -132,20 +137,21 @@ const FileUpload = () => {
       >
         <div className="p-8 text-center">
           <div className="mb-4">
-            <Upload className={cn(
-              "mx-auto h-12 w-12 transition-colors duration-300",
-              isDragging ? "text-primary" : "text-muted-foreground"
-            )} />
+            <Upload
+              className={cn(
+                "mx-auto h-12 w-12 transition-colors duration-300",
+                isDragging ? "text-primary" : "text-muted-foreground"
+              )}
+            />
           </div>
-          
           <h3 className="text-lg font-semibold mb-2">
-            {isUploading ? "Uploading files..." : "Drop files here or click to upload"}
+            {isUploading
+              ? "Uploading files..."
+              : "Drop files here or click to upload"}
           </h3>
-          
           <p className="text-sm text-muted-foreground mb-4">
             Supports images, videos, documents, audio files and more
           </p>
-
           <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
@@ -153,7 +159,6 @@ const FileUpload = () => {
           >
             Choose Files
           </Button>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -169,10 +174,9 @@ const FileUpload = () => {
       {files.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Uploaded Files</h3>
-          
           {files.map((uploadedFile) => (
-            <Card 
-              key={uploadedFile.id} 
+            <Card
+              key={uploadedFile.id}
               className="p-4 bg-card/50 backdrop-blur-sm border shadow-card animate-slide-up"
             >
               <div className="flex items-start gap-4">
@@ -197,7 +201,7 @@ const FileUpload = () => {
                   <p className="text-sm text-muted-foreground">
                     {formatFileSize(uploadedFile.file.size)}
                   </p>
-                  
+
                   {/* Share URL */}
                   <div className="mt-2 flex items-center gap-2">
                     <Link className="h-4 w-4 text-primary" />
