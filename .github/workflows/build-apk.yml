@@ -1,4 +1,4 @@
-name: Build GetLink APK
+name: Build Web Assets
 
 on:
   push:
@@ -12,127 +12,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
+      # Checkout the repo
       - uses: actions/checkout@v4
 
-      # 2. Setup Node.js (use 20 for better dependency support)
+      # Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20'       # Use Node 20 for better compatibility
           cache: 'npm'
 
-      # 3. Setup Java JDK 17
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # 4. Setup Android SDK
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '9477386'
-          accept-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-33
-            build-tools;33.0.2
-
-      # 5. Cache Gradle
-      - name: Cache Gradle
+      # Cache npm dependencies
+      - name: Cache npm
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-node-
 
-      # 6. Install NPM dependencies
+      # Install npm dependencies (ignore SWC native scripts)
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --ignore-scripts
 
-      # 7. Build web assets (Vite JS-only build)
+      # Build web app
       - name: Build web app
         run: npm run build
 
-      # 8. Verify dist folder
+      # Verify dist folder
       - name: Verify dist folder
         run: |
           if [ ! -d dist ]; then
-            echo "dist folder missing. Build failed!"
+            echo "dist/ folder missing. Build failed."
             exit 1
           fi
-          ls -la dist
+          ls -la dist/
 
-      # 9. Add Capacitor Android platform
-      - name: Add Android platform
-        run: |
-          if [ -d android ]; then
-            rm -rf android
-          fi
-          npx cap add android
-
-      # 10. Sync Capacitor
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      # 11. Make Gradlew executable
-      - name: Make Gradlew executable
-        run: chmod +x android/gradlew
-
-      # 12. Build APK
-      - name: Build APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --stacktrace --info
-
-      # 13. Verify APK exists
-      - name: Verify APK
-        run: |
-          if [ ! -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "APK not found!"
-            exit 1
-          fi
-          ls -la android/app/build/outputs/apk/debug/
-
-      # 14. Upload APK artifact
-      - name: Upload APK artifact
+      # Upload dist folder as artifact
+      - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
-          name: getlink-debug-apk-${{ github.run_number }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: getlink-dist-${{ github.run_number }}
+          path: dist
           retention-days: 30
-
-      # 15. Optional: create GitHub Release
-      - name: Create Release
-        if: github.ref == 'refs/heads/main'
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-        with:
-          tag_name: v${{ github.run_number }}
-          release_name: GetLink v${{ github.run_number }}
-          body: |
-            🚀 Automated release of GetLink APK
-            🔎 Commit: ${{ github.sha }}
-            🕑 Built at: ${{ github.run_started_at }}
-            📱 Download the APK from assets below.
-          draft: false
-          prerelease: false
-
-      # 16. Upload Release Asset
-      - name: Upload Release Asset
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: android/app/build/outputs/apk/debug/app-debug.apk
-          asset_name: GetLink-v${{ github.run_number }}.apk
-          asset_content_type: application/vnd.android.package-archive
