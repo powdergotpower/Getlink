@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build GetLink APK
 
 on:
   push:
@@ -12,38 +12,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repo
       - uses: actions/checkout@v4
 
-      # Setup Node.js
+      # 2. Setup Node.js (use 20 for better dependency support)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'   # Node 20 is more compatible with latest dependencies
+          node-version: '20'
           cache: 'npm'
 
-      # Setup Java JDK 17
+      # 3. Setup Java JDK 17
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Export JAVA_HOME
-        run: echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-
-      # Setup Android SDK (stable versions)
+      # 4. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: "9477386"
+          cmdline-tools-version: '9477386'
           accept-android-sdk-licenses: true
           packages: |
             platform-tools
-            platforms;android-32
-            build-tools;32.0.0
+            platforms;android-33
+            build-tools;33.0.2
 
-      # Cache Gradle packages
-      - name: Cache Gradle packages
+      # 5. Cache Gradle
+      - name: Cache Gradle
         uses: actions/cache@v3
         with:
           path: |
@@ -53,70 +51,55 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # Install dependencies
+      # 6. Install NPM dependencies
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
-      # Build web app
+      # 7. Build web assets (Vite JS-only build)
       - name: Build web app
         run: npm run build
 
-      # Verify dist folder
+      # 8. Verify dist folder
       - name: Verify dist folder
         run: |
           if [ ! -d dist ]; then
-            echo "dist/ folder missing. Check your build config."
+            echo "dist folder missing. Build failed!"
             exit 1
           fi
-          ls -la dist/
+          ls -la dist
 
-      # Add Android platform cleanly
+      # 9. Add Capacitor Android platform
       - name: Add Android platform
         run: |
-          if [ -d "android" ]; then
+          if [ -d android ]; then
             rm -rf android
           fi
           npx cap add android
 
-      # Configure Gradle JVM safely
-      - name: Configure Gradle JVM
-        run: |
-          mkdir -p android
-          touch android/gradle.properties
-          grep -q "org.gradle.java.home" android/gradle.properties || echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
-          grep -q "org.gradle.jvmargs" android/gradle.properties || echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
-
-      # Patch build.gradle for Java 17 compatibility (if not already set)
-      - name: Fix Android Gradle config
-        run: |
-          FILE="android/app/build.gradle"
-          grep -q "sourceCompatibility JavaVersion.VERSION_17" $FILE || sed -i "/android {/a \    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    kotlinOptions {\n        jvmTarget = \"17\"\n    }" $FILE
-
-      # Sync Capacitor
+      # 10. Sync Capacitor
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # Make Gradlew executable
+      # 11. Make Gradlew executable
       - name: Make Gradlew executable
-        run: chmod 755 android/gradlew
+        run: chmod +x android/gradlew
 
-      # Build APK
+      # 12. Build APK
       - name: Build APK
         run: |
           cd android
           ./gradlew assembleDebug --stacktrace --info
 
-      # Verify APK exists
-      - name: Verify APK exists
+      # 13. Verify APK exists
+      - name: Verify APK
         run: |
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -f "$APK" ]; then
+          if [ ! -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
             echo "APK not found!"
             exit 1
           fi
           ls -la android/app/build/outputs/apk/debug/
 
-      # Upload APK artifact
+      # 14. Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -124,7 +107,7 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
-      # Create GitHub Release
+      # 15. Optional: create GitHub Release
       - name: Create Release
         if: github.ref == 'refs/heads/main'
         id: create_release
@@ -137,12 +120,12 @@ jobs:
           body: |
             🚀 Automated release of GetLink APK
             🔎 Commit: ${{ github.sha }}
-            🕑 Build timestamp: ${{ github.run_started_at }}
+            🕑 Built at: ${{ github.run_started_at }}
             📱 Download the APK from assets below.
           draft: false
           prerelease: false
 
-      # Upload Release Asset
+      # 16. Upload Release Asset
       - name: Upload Release Asset
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-release-asset@v1
