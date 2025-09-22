@@ -17,13 +17,13 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'   # ✅ Capacitor requires >=20, so we use Node 22
+        node-version: '22'   # ✅ Capacitor requires >=20
         cache: 'npm'
     
     - name: Setup Java JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '21'   # ✅ Fix: match Gradle/Capacitor requirements
+        java-version: '17'   # ✅ Stable for Gradle/Capacitor
         distribution: 'temurin'
     
     - name: Setup Android SDK
@@ -66,7 +66,7 @@ jobs:
       id: create_release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}   # ✅ Use your PAT secret
       with:
         tag_name: v${{ github.run_number }}
         release_name: GetLink v${{ github.run_number }}
@@ -81,7 +81,7 @@ jobs:
       if: github.ref == 'refs/heads/main'
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}   # ✅ Same PAT here
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: android/app/build/outputs/apk/debug/app-debug.apk
